@@ -1,4 +1,5 @@
 mod max;
+mod all_zeros;
 
 use max::compute_max;
 
