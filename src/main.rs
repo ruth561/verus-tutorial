@@ -1,4 +1,7 @@
 mod max;
+mod all_zeros;
+mod binary_search;
+mod strictly_increasing_sequence;
 
 use max::*;
 
@@ -10,4 +13,5 @@ fn main() {
     println!("max({x}, {y}) = {}", compute_max(x, y));
 
     max_test();
+    binary_search::test();
 }
