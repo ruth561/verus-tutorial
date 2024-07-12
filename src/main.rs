@@ -1,6 +1,7 @@
 mod max;
 mod all_zeros;
 mod binary_search;
+mod strictly_increasing_sequence;
 
 use max::compute_max;
 
