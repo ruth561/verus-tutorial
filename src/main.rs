@@ -1,6 +1,6 @@
 mod max;
 
-use max::compute_max;
+use max::*;
 
 fn main() {
     println!("Hello, world!");
@@ -8,4 +8,6 @@ fn main() {
     let x = 3;
     let y = 0;
     println!("max({x}, {y}) = {}", compute_max(x, y));
+
+    max_test();
 }
