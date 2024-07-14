@@ -1,4 +1,5 @@
 use std::ops::Add;
+use std::fmt;
 
 use vstd::prelude::*;
 
@@ -104,22 +105,32 @@ pub fn test() {
 
     x = inf;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{} + {} = {}", x, y, x + y);
 
     x = inf;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{} + {} = {}", x, y, x + y);
 
     x = n;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{} + {} = {}", x, y, x + y);
 
     x = n;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{} + {} = {}", x, y, x + y);
 
     x = ExtInt::Int(i64::MAX);
-    println!("{:?} + {:?} = {:?}", x, x, x + x);
+    println!("{} + {} = {}", x, x, x + x);
 }
 
 } // verus!
+
+impl fmt::Display for ExtInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExtInt::Int(n) => write!(f, "{}", *n),
+            ExtInt::Inf => write!(f, "∞"),
+            ExtInt::Overflow => write!(f, "Overflow"),
+        }
+    }
+}
