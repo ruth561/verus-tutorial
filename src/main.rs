@@ -2,6 +2,7 @@ mod max;
 mod all_zeros;
 mod binary_search;
 mod strictly_increasing_sequence;
+mod ext_int;
 
 use max::*;
 
@@ -14,4 +15,5 @@ fn main() {
 
     max_test();
     binary_search::test();
+    ext_int::test();
 }
