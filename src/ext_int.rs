@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use vstd::prelude::*;
 
 
@@ -9,52 +11,68 @@ verus! {
 
 #[derive(Debug, Copy, Clone)]
 enum ExtInt {
-    Inf,
     Int(i64),
+    Inf,
+    Overflow, // overflowed
 }
 
 impl ExtInt {
 
-    // return true if lhs + rhs cause overflow
-    pub closed spec fn spec_check_add_overflow(self: ExtInt, rhs: ExtInt) -> bool {
-        match (self, rhs) {
-            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
-                if n1 + n2 > i64::MAX {
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
+    pub closed spec fn is_overflow(self) -> bool {
+        self == ExtInt::Overflow
     }
 
-    // オーバーフローを検知したらNoneを返す
-    pub closed spec fn spec_checked_add(self, rhs: ExtInt) -> Option<ExtInt> {
+    // self + rhs がオーバーフローを引き起こすときはtrueを返す
+    // return true iff lhs + rhs cause overflow
+    pub closed spec fn spec_check_add_overflow(self, rhs: ExtInt) -> bool {
         match (self, rhs) {
-            (ExtInt::Inf, _) => Some(ExtInt::Inf),
-            (_, ExtInt::Inf) => Some(ExtInt::Inf),
+            (ExtInt::Overflow, _) => true,
+            (_, ExtInt::Overflow) => true,
+            (ExtInt::Inf, _) => false,
+            (_, ExtInt::Inf) => false,
             (ExtInt::Int(n1), ExtInt::Int(n2)) => {
                 if i64::MIN <= n1 + n2 <= i64::MAX {
-                    Some(ExtInt::Int((n1 + n2) as i64))
-                } else { // treat as INF when overflow occurs
-                    None
+                    false
+                } else {
+                    true
                 }
             }
         }
     }
 
-    pub fn checked_add(self, rhs: ExtInt) -> (result: Option<ExtInt>)
+    pub closed spec fn spec_add(self, rhs: ExtInt) -> ExtInt {
+        match (self, rhs) {
+            (ExtInt::Overflow, _) => ExtInt::Overflow,
+            (_, ExtInt::Overflow) => ExtInt::Overflow,
+            (ExtInt::Inf, _) => ExtInt::Inf,
+            (_, ExtInt::Inf) => ExtInt::Inf,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                if i64::MIN <= n1 + n2 <= i64::MAX {
+                    ExtInt::Int((n1 + n2) as i64)
+                } else {
+                    ExtInt::Overflow
+                }
+            }
+        }
+    }
+
+}
+
+impl Add for ExtInt {
+    type Output = ExtInt;
+    fn add(self, rhs: Self) -> (result: Self::Output)
         ensures
-            result == self.spec_checked_add(rhs),
+            result == self.spec_add(rhs),
     {
         match (self, rhs) {
-            (ExtInt::Inf, _) => Some(ExtInt::Inf),
-            (_, ExtInt::Inf) => Some(ExtInt::Inf),
+            (ExtInt::Overflow, _) => ExtInt::Overflow,
+            (_, ExtInt::Overflow) => ExtInt::Overflow,
+            (ExtInt::Inf, _) => ExtInt::Inf,
+            (_, ExtInt::Inf) => ExtInt::Inf,
             (ExtInt::Int(n1), ExtInt::Int(n2)) => {
                 match ex_i64_checked_add(n1, n2) {
-                    Some(n) => Some(ExtInt::Int(n)),
-                    None => None,
+                    Some(n) => ExtInt::Int(n),
+                    None => ExtInt::Overflow,
                 }
             }
         }
@@ -78,9 +96,7 @@ pub fn ex_i64_checked_add(lhs: i64, rhs: i64) -> (result: Option<i64>)
 
 #[verifier::external_body]
 pub fn test() {
-    
     let inf = ExtInt::Inf;
-    assert(inf.checked_add(inf) == inf);
     let n = ExtInt::Int(7);
 
     let mut x;
@@ -88,22 +104,22 @@ pub fn test() {
 
     x = inf;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x.checked_add(y));
+    println!("{:?} + {:?} = {:?}", x, y, x + y);
 
     x = inf;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x.checked_add(y));
+    println!("{:?} + {:?} = {:?}", x, y, x + y);
 
     x = n;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x.checked_add(y));
+    println!("{:?} + {:?} = {:?}", x, y, x + y);
 
     x = n;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x.checked_add(y));
+    println!("{:?} + {:?} = {:?}", x, y, x + y);
 
     x = ExtInt::Int(i64::MAX);
-    println!("{:?} + {:?} = {:?}", x, x, x.checked_add(x));
+    println!("{:?} + {:?} = {:?}", x, x, x + x);
 }
 
 } // verus!
