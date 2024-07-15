@@ -222,6 +222,16 @@ impl ExtInt {
         }
     }
 
+    // sumでオーバーフローが発生するかどうか（オーバーフローするときにtrueを返す）
+    // 健全なアプローチ
+    pub open spec fn seq_check_sum_overflow(seq: Seq<ExtInt>) -> bool {
+        let not_overflow =
+            seq.len() <= i32::MAX &&
+            forall|i:int| 0 <= i < seq.len() ==>
+                seq[i].is_inf() || (seq[i].is_int() && i32::MIN <= seq[i].unwrap() <= i32::MAX);
+        !not_overflow
+    }
+
     pub fn vec_checked_sum(v: &Vec<ExtInt>) -> (result: Option<ExtInt>)
         ensures
             result == ExtInt::seq_checked_sum(v@),
@@ -237,6 +247,51 @@ impl ExtInt {
             assert(v@.subrange(0, i as int) =~= v@.subrange(0, (i+1) as int).drop_last());
             if let Some(s) = ans {
                 ans = s.checked_add(v[i]);
+            }
+            i += 1;
+        }
+        assert(v@.subrange(0, v.len() as int) =~= v@);
+        ans
+    }
+
+    // オーバーフローしないsum
+    pub fn vec_sum(v: &Vec<ExtInt>) -> (result: ExtInt)
+        requires
+            !ExtInt::seq_check_sum_overflow(v@),
+        ensures
+            Some(result) == ExtInt::seq_checked_sum(v@),
+    {
+        assert(v.len() <= i32::MAX);
+
+        let mut i = 0;
+        let mut ans = ExtInt::Int(0);
+        while i < v.len()
+            invariant
+                !ExtInt::seq_check_sum_overflow(v@),
+                0 <= i <= v.len() as int,
+                ans.is_inf() || i * i32::MIN <= ans.unwrap() <= i * i32::MAX,
+                Some(ans) == ExtInt::seq_checked_sum(v@.subrange(0, i as int)),
+        {
+            // seq_checked_sumの中で使われる外部等価性を提示してあげる必要がある。
+            assert(v@.subrange(0, i as int) =~= v@.subrange(0, (i+1) as int).drop_last());
+            
+            if ans.is_inf() {
+                ans = ans.add(v[i]);
+                assert(ans.is_inf());
+            } else {
+                if v[i].is_int() {
+                    proof {
+                        let m = ans.unwrap();
+                        let k = v[i as int].unwrap();
+                        assert(i * i32::MIN <= m <= i * i32::MAX);
+                        assert(v.len() <= i32::MAX);
+                        assert(0 <= i <= i32::MAX - 1);
+                        assert((i32::MAX - 1) * i32::MIN <= m <= (i32::MAX - 1) * i32::MAX);
+                        assert(i32::MIN <= k <= i32::MAX);
+                        assert(i32::MAX * i32::MIN <= m + k <= i32::MAX * i32::MAX);
+                    }
+                }
+                ans = ans.add(v[i]);
             }
             i += 1;
         }
@@ -440,6 +495,18 @@ fn test_exec_4() {
     assert(n.unwrap().is_inf());
 }
 
+fn test_exec_5() {
+    let mut v = Vec::new();
+    v.push(ExtInt::Int(99));
+    v.push(ExtInt::Int(1729));
+    v.push(ExtInt::Int(-33));
+    v.push(ExtInt::Int(50001));
+    v.push(ExtInt::Int(-7777));
+    let s = ExtInt::vec_sum(&v);
+    proof { ExtInt::lem_sum_of_all_int_seq_is_int(v@) }
+    assert(s.is_int());
+}
+
 #[verifier::external_body]
 pub fn test() {
     let inf = ExtInt::Inf;
@@ -492,6 +559,15 @@ pub fn test() {
     v.push(ExtInt::Int(7));
     let ans = ExtInt::vec_checked_sum(&v).unwrap();
     println!("sum of {:?} is {:?}", v, ans);
+
+    let mut v = Vec::new();
+    v.push(ExtInt::Int(99));
+    v.push(ExtInt::Int(1729));
+    v.push(ExtInt::Int(-33));
+    v.push(ExtInt::Int(50001));
+    v.push(ExtInt::Int(-7777));
+    let s = ExtInt::vec_sum(&v);
+    println!("{}", s);
 }
 
 } // verus!
