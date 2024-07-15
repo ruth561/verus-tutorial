@@ -29,6 +29,11 @@ proof fn test_subrange() {
     assert(a.subrange(1, 3) =~= seq![3, 5]);
 }
 
+proof fn test_skip() {
+    let a: Seq<int> = seq![1, 3, 5, 7, 9, 11, 13, 15, 17];
+    assert(a.skip(5) =~= seq![11, 13, 15, 17]); // 先頭5要素を取り除いたsubseqを返す
+}
+
 #[verifier::external_body]
 pub fn test() {
     println!("=== seq_ex ===");
