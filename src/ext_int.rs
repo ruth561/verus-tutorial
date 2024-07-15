@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::ops::Add;
 use std::fmt;
 
 use vstd::prelude::*;
@@ -73,7 +72,7 @@ impl ExtInt {
         requires
             self.is_int(),
         ensures
-            result == self.spec_unwrap(),
+            result == self.unwrap(),
     {
         if let ExtInt::Int(n) = *self {
             n
@@ -85,8 +84,9 @@ impl ExtInt {
         }
     }
 
-    // self + rhs がオーバーフローを引き起こすときはtrueを返す
-    // return true iff lhs + rhs cause overflow
+    // check_add_overflow
+    //   - if *self + *rhs causes overflow, then return true
+    //   - otherwise false
     pub closed spec fn spec_check_add_overflow(self, rhs: ExtInt) -> bool {
         match (self, rhs) {
             (ExtInt::Inf, _) => false,
@@ -101,10 +101,24 @@ impl ExtInt {
         }
     }
 
-    pub closed spec fn spec_checked_add(self, rhs: ExtInt) -> Option<ExtInt>
-        recommends
-            !self.spec_check_add_overflow(rhs)
+    #[verifier::when_used_as_spec(spec_check_add_overflow)]
+    pub fn check_add_overflow(self, rhs: ExtInt) -> (b: bool)
+        ensures
+            b == self.check_add_overflow(rhs),
     {
+        if let ExtInt::Int(n1) = self {
+            if let ExtInt::Int(n2) = rhs {
+                let n = n1.checked_add(n2);
+                if n.is_none() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    // checked_add
+    pub closed spec fn spec_checked_add(self, rhs: ExtInt) -> Option<ExtInt> {
         match (self, rhs) {
             (ExtInt::Inf, _) => Some(ExtInt::Inf),
             (_, ExtInt::Inf) => Some(ExtInt::Inf),
@@ -118,10 +132,27 @@ impl ExtInt {
         }
     }
 
+    #[verifier::when_used_as_spec(spec_checked_add)]
+    pub fn checked_add(self, rhs: ExtInt) -> (result: Option<ExtInt>)
+        ensures
+            result == self.checked_add(rhs),
+            result.is_none() == self.check_add_overflow(rhs),
+            result.is_some() ==> (result.unwrap().is_inf() <==> self.is_inf() || rhs.is_inf()),
+            result.is_some() && result.unwrap().is_int() ==> (result.unwrap().unwrap() == self.unwrap() + rhs.unwrap()),
+    {
+        match (self, rhs) {
+            (ExtInt::Inf, _) => Some(ExtInt::Inf),
+            (_, ExtInt::Inf) => Some(ExtInt::Inf),
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                Some(ExtInt::Int(n1.checked_add(n2)?))
+            }
+        }
+    }
+
     pub proof fn lem_checked_add(self, rhs: ExtInt)
         ensures
-            self == ExtInt::Inf || rhs == ExtInt::Inf <==> self.spec_checked_add(rhs) == Some(ExtInt::Inf),
-            self.spec_check_add_overflow(rhs) <==> self.spec_checked_add(rhs) == None::<ExtInt>,
+            self == ExtInt::Inf || rhs == ExtInt::Inf <==> self.checked_add(rhs) == Some(ExtInt::Inf),
+            self.check_add_overflow(rhs) <==> self.checked_add(rhs) == None::<ExtInt>,
     {}
 
     pub closed spec fn spec_lt(self, rhs: ExtInt) -> bool {
@@ -147,31 +178,32 @@ impl ExtInt {
         !self.spec_lt(rhs)
     }
 
-    // オーバーフローを検査する加算
-    pub fn checked_add(self, rhs: ExtInt) -> (result: Option<ExtInt>)
-        ensures
-            result == self.spec_checked_add(rhs),
-            self.spec_check_add_overflow(rhs) <==> result == None::<ExtInt>,
+    // add
+    pub closed spec fn spec_add(self, rhs: ExtInt) -> (n: ExtInt)
+        recommends
+            !self.check_add_overflow(rhs),
     {
         match (self, rhs) {
-            (ExtInt::Inf, _) => Some(ExtInt::Inf),
-            (_, ExtInt::Inf) => Some(ExtInt::Inf),
-            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
-                Some(ExtInt::Int(ex_i64_checked_add(n1, n2)?))
-            }
+            (ExtInt::Inf, _) => ExtInt::Inf,
+            (_, ExtInt::Inf) => ExtInt::Inf,
+            (n1, n2) => ExtInt::Int((n1.unwrap() + n2.unwrap()) as i64),
         }
     }
 
-}
-
-impl Add for ExtInt {
-    type Output = ResultExtInt;
-    fn add(self, rhs: Self) -> Self::Output {
-        match self.checked_add(rhs) {
-            Some(n) => ResultExtInt::Ok(n),
-            None => ResultExtInt::Overflow,
+    #[verifier::when_used_as_spec(spec_add)]
+    pub fn add(self, rhs: ExtInt) -> (n: ExtInt)
+        requires
+            !self.check_add_overflow(rhs),
+        ensures
+            self.checked_add(rhs) == Some(n),
+    {
+        match (self, rhs) {
+            (ExtInt::Inf, _) => ExtInt::Inf,
+            (_, ExtInt::Inf) => ExtInt::Inf,
+            (n1, n2) => ExtInt::Int(n1.unwrap() + n2.unwrap()),
         }
     }
+
 }
 
 impl PartialEq for ExtInt {
@@ -224,9 +256,10 @@ impl Ord for ExtInt {
 // This implementations refer to the implementations at the following URL
 // https://github.com/verus-lang/verus/blob/23a5b86e270939935df5997f9d4c8b9fcb5fddda/source/vstd/std_specs/num.rs#L244-L364
 
+// i64::checked_add(self, i64) 関数に仕様を追加する宣言
 // オーバーフローを検知してくれる関数
 // このコードはTrustedをマークしている
-#[verifier::external_body]
+#[verifier::external_fn_specification]
 pub fn ex_i64_checked_add(lhs: i64, rhs: i64) -> (result: Option<i64>)
     ensures
         lhs + rhs > i64::MAX || lhs + rhs < i64::MIN ==> result.is_None(),
@@ -239,9 +272,9 @@ proof fn test_spec()
 {
     let a = ExtInt::Inf;
     let b = ExtInt::Int(1000);
-    assert(a.spec_checked_add(b) == Some(ExtInt::Inf));
-    assert(b.spec_checked_add(b) == Some(ExtInt::Int(2000)));
-    assert(b.spec_checked_add(b) == Some(ExtInt::Int(2000)));
+    assert(a.checked_add(b) == Some(ExtInt::Inf));
+    assert(b.checked_add(b) == Some(ExtInt::Int(2000)));
+    assert(b.checked_add(b) == Some(ExtInt::Int(2000)));
 
     assert(ExtInt::Int(0) < ExtInt::Inf);
     assert(ExtInt::Int(0) < ExtInt::Int(1));
@@ -262,6 +295,19 @@ proof fn test_spec_2() {
     assert(num.unwrap() == 123);
 }
 
+proof fn test_spec_3() {
+    let n = ExtInt::Int(i64::MAX);
+
+    let m = n + n;
+    assert(m.is_int());
+}
+
+fn test_exec() {
+    let n = ExtInt::Int(1000);
+    let m = n.add(n);
+    assert(n < m);
+}
+
 #[verifier::external_body]
 pub fn test() {
     let inf = ExtInt::Inf;
@@ -272,26 +318,26 @@ pub fn test() {
 
     x = inf;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{:?} + {:?} = {:?}", x, y, x.add(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = inf;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{:?} + {:?} = {:?}", x, y, x.add(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = n;
     y = inf;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{:?} + {:?} = {:?}", x, y, x.add(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = n;
     y = n;
-    println!("{:?} + {:?} = {:?}", x, y, x + y);
+    println!("{:?} + {:?} = {:?}", x, y, x.add(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = ExtInt::Int(i64::MAX);
-    println!("{:?} + {:?} = {:?}", x, x, x + x);
+    println!("{:?} + {:?} = {:?}", x, x, x.add(x));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     let a = ExtInt::Inf;
