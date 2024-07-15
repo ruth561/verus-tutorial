@@ -24,6 +24,11 @@ proof fn test_equality() {
     assert(a == d);
 }
 
+proof fn test_subrange() {
+    let a: Seq<int> = seq![1, 3, 5, 7];
+    assert(a.subrange(1, 3) =~= seq![3, 5]);
+}
+
 #[verifier::external_body]
 pub fn test() {
     println!("=== seq_ex ===");
