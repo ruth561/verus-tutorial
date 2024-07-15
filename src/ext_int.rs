@@ -25,6 +25,66 @@ pub enum ResultExtInt {
 
 impl ExtInt {
 
+    // is_int
+    #[verifier::inline]
+    pub open spec fn spec_is_int(&self) -> bool {
+        is_variant(self, "Int")
+    }
+
+    #[verifier::when_used_as_spec(spec_is_int)]
+    pub fn is_int(&self) -> (b: bool)
+        ensures
+            b == self.is_int(),
+    {
+        match *self {
+            ExtInt::Int(_) => true,
+            _ => false,
+        }
+    }
+
+    // is_inf
+    #[verifier::inline]
+    pub open spec fn spec_is_inf(&self) -> bool {
+        is_variant(self, "Inf")
+    }
+
+    #[verifier::when_used_as_spec(spec_is_inf)]
+    pub fn is_inf(&self) -> (b: bool)
+        ensures
+            b == self.is_inf(),
+    {
+        match *self {
+            ExtInt::Inf => true,
+            _ => false,
+        }
+    }
+
+    // unwrap
+    #[verifier::inline]
+    pub open spec fn spec_unwrap(&self) -> i64
+        recommends
+            self.is_int()
+    {
+        get_variant_field(self, "Int", "0")
+    }
+
+    #[verifier::when_used_as_spec(spec_unwrap)] // spec関数で使われたときはspec_unwrapが使われる
+    pub fn unwrap(&self) -> (result: i64)
+        requires
+            self.is_int(),
+        ensures
+            result == self.spec_unwrap(),
+    {
+        if let ExtInt::Int(n) = *self {
+            n
+        } else {
+            // 本来、ここには到達しないのだが、unreachableなどの明示するためのツールがVerusでは
+            // 未対応なため、assert(false)によって到達しないことを確認したのち、適当な値を返す実装になっている。
+            assert(false);
+            0
+        }
+    }
+
     // self + rhs がオーバーフローを引き起こすときはtrueを返す
     // return true iff lhs + rhs cause overflow
     pub closed spec fn spec_check_add_overflow(self, rhs: ExtInt) -> bool {
@@ -191,6 +251,17 @@ proof fn test_spec()
     assert(b < a);
 }
 
+proof fn test_spec_2() {
+    let inf = ExtInt::Inf;
+    let num = ExtInt::Int(123);
+
+    assert(!inf.is_int());
+    assert( inf.is_inf());
+    assert( num.is_int());
+    assert(!num.is_inf());
+    assert(num.unwrap() == 123);
+}
+
 #[verifier::external_body]
 pub fn test() {
     let inf = ExtInt::Inf;
@@ -230,6 +301,12 @@ pub fn test() {
     } else {
         println!("a is not less than b");
     }
+
+    println!("{}.is_int() = {}", a, a.is_int());
+    println!("{}.is_int() = {}", b, b.is_int());
+    println!("{}.is_inf() = {}", a, a.is_inf());
+    println!("{}.is_inf() = {}", b, b.is_inf());
+    println!("{}.unwrap() = {}", b, b.unwrap());
 }
 
 } // verus!
