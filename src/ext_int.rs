@@ -259,6 +259,46 @@ impl ExtInt {
             rhs == ExtInt::Int(0) ==> self.add(rhs) == self,
     {}
 
+    // 数列内にInfが1つもなく、checked_sumが何かしらの値を返すならば、その値はintである。
+    proof fn lem_sum_of_all_int_seq_is_int(seq: Seq<ExtInt>)
+        requires
+            forall|i:int| 0 <= i < seq.len() ==> seq[i].is_int(),
+            ExtInt::seq_checked_sum(seq).is_some(),
+        ensures
+            ExtInt::seq_checked_sum(seq).unwrap().is_int(),
+        decreases
+            seq.len(),
+    {
+        if seq.len() == 0 {
+        } else {
+            ExtInt::lem_sum_of_all_int_seq_is_int(seq.drop_last());
+        }
+    }
+
+    // 列の中にInfが１つでもあれば、合計値もInfになる。
+    proof fn lem_sum_of_seq_with_inf_is_inf(seq: Seq<ExtInt>)
+        requires
+            exists|i:int| 0 <= i < seq.len() && seq[i].is_inf(),
+            ExtInt::seq_checked_sum(seq).is_some(),
+        ensures
+            ExtInt::seq_checked_sum(seq).unwrap().is_inf(),
+        decreases
+            seq.len(),
+    {
+        if seq.len() == 0 {
+            // infの存在条件から-seq.len() == 0 となることはない
+            assert(false);
+        } else {
+            let i = choose|i:int| 0 <= i < seq.len() && seq[i].is_inf();
+            if i < seq.len() - 1 {
+                assert(0 <= i < seq.drop_last().len() && seq.drop_last()[i].is_inf());
+                assert(exists|i:int| #![auto] 0 <= i < seq.drop_last().len() && seq.drop_last()[i].is_inf());
+                ExtInt::lem_sum_of_seq_with_inf_is_inf(seq.drop_last());
+            }
+        }
+
+    }
+
 }
 
 impl PartialEq for ExtInt {
@@ -376,6 +416,28 @@ fn test_exec_3() {
     let ans = ExtInt::vec_checked_sum(&v);
     assert(ans.is_some());
     assert(ans.unwrap() == ExtInt::Int(10));
+}
+
+fn test_exec_4() {
+    let mut v = Vec::new();
+    v.push(ExtInt::Int(2));
+    v.push(ExtInt::Int(3));
+    v.push(ExtInt::Int(5));
+
+    let n = ExtInt::vec_checked_sum(&v);
+    reveal_with_fuel(ExtInt::seq_checked_sum, 4);
+    assert(n.is_some());
+    proof { ExtInt::lem_sum_of_all_int_seq_is_int(v@); }
+    assert(n.unwrap().is_int());
+
+    v.push(ExtInt::Inf);
+    v.push(ExtInt::Int(7));
+
+    let n = ExtInt::vec_checked_sum(&v);
+    reveal_with_fuel(ExtInt::seq_checked_sum, 10);
+    assert(n.is_some());
+    proof { ExtInt::lem_sum_of_seq_with_inf_is_inf(v@); }
+    assert(n.unwrap().is_inf());
 }
 
 #[verifier::external_body]
