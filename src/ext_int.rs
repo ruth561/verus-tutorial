@@ -204,6 +204,61 @@ impl ExtInt {
         }
     }
 
+    // TODO: checked_sumを、exec関数ではVec<ExtInt>に対して、spec関数ではSeq<ExtInt>に対して
+    // 行うようにしたい。ただ、#[verifier::when_used_as_spec(...)]は関数のシグネチャが異なってしまうため、
+    // うまくできなさそう。
+
+    // checked_sum
+    pub open spec fn seq_checked_sum(seq: Seq<ExtInt>) -> Option<ExtInt>
+        decreases seq.len(),
+    {
+        if seq.len() == 0 {
+            Some(ExtInt::Int(0))
+        } else {
+            match ExtInt::seq_checked_sum(seq.drop_last()) {
+                Some(s) => s.checked_add(seq[seq.len()-1]),
+                None => None,
+            }
+        }
+    }
+
+    pub fn vec_checked_sum(v: &Vec<ExtInt>) -> (result: Option<ExtInt>)
+        ensures
+            result == ExtInt::seq_checked_sum(v@),
+    {
+        let mut i = 0;
+        let mut ans = Some(ExtInt::Int(0));
+        while i < v.len()
+            invariant
+                i <= v.len() as int,
+                ans == ExtInt::seq_checked_sum(v@.subrange(0, i as int)),
+        {
+            // seq_checked_sumの中で使われる外部等価性を提示してあげる必要がある。
+            assert(v@.subrange(0, i as int) =~= v@.subrange(0, (i+1) as int).drop_last());
+            if let Some(s) = ans {
+                ans = s.checked_add(v[i]);
+            }
+            i += 1;
+        }
+        assert(v@.subrange(0, v.len() as int) =~= v@);
+        ans
+    }
+
+}
+
+// proof関数を実装していく場所
+impl ExtInt {
+
+    // rhsの符号に応じて加算結果の大小関係が変わる
+    proof fn lem_add_and_cmp(self, rhs: ExtInt)
+        requires
+            !self.check_add_overflow(rhs),
+        ensures
+            rhs <  ExtInt::Int(0) ==> self.add(rhs) <= self,
+            rhs >  ExtInt::Int(0) ==> self.add(rhs) >= self,
+            rhs == ExtInt::Int(0) ==> self.add(rhs) == self,
+    {}
+
 }
 
 impl PartialEq for ExtInt {
@@ -306,6 +361,21 @@ fn test_exec() {
     let n = ExtInt::Int(1000);
     let m = n.add(n);
     assert(n < m);
+
+    let x = ExtInt::Int(i64::MAX);
+    // x.add(x); // オーバーフローの可能性は検証器が見つけてくれる。
+}
+
+fn test_exec_3() {
+    let mut v = Vec::new();
+    v.push(ExtInt::Int(2));
+    v.push(ExtInt::Int(3));
+    v.push(ExtInt::Int(5));
+    
+    reveal_with_fuel(ExtInt::seq_checked_sum, 4);
+    let ans = ExtInt::vec_checked_sum(&v);
+    assert(ans.is_some());
+    assert(ans.unwrap() == ExtInt::Int(10));
 }
 
 #[verifier::external_body]
@@ -336,10 +406,6 @@ pub fn test() {
     println!("{:?} + {:?} = {:?}", x, y, x.add(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
-    x = ExtInt::Int(i64::MAX);
-    println!("{:?} + {:?} = {:?}", x, x, x.add(x));
-    println!("{:?} < {:?} = {:?}", x, y, x < y);
-
     let a = ExtInt::Inf;
     let b = ExtInt::Int(1000);
     if a < b {
@@ -353,6 +419,17 @@ pub fn test() {
     println!("{}.is_inf() = {}", a, a.is_inf());
     println!("{}.is_inf() = {}", b, b.is_inf());
     println!("{}.unwrap() = {}", b, b.unwrap());
+
+    let mut v = Vec::new();
+    v.push(ExtInt::Int(2));
+    v.push(ExtInt::Int(3));
+    v.push(ExtInt::Int(5));
+    let ans = ExtInt::vec_checked_sum(&v).unwrap();
+    println!("sum of {:?} is {:?}", v, ans);
+    v.push(ExtInt::Inf);
+    v.push(ExtInt::Int(7));
+    let ans = ExtInt::vec_checked_sum(&v).unwrap();
+    println!("sum of {:?} is {:?}", v, ans);
 }
 
 } // verus!
