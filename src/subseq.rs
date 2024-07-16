@@ -1,4 +1,5 @@
 use vstd::prelude::*;
+use vstd::slice::slice_subrange;
 use crate::strictly_increasing_sequence::*;
 
 
@@ -163,7 +164,40 @@ pub proof fn lem_is_subseq<T: Eq>(s: Seq<T>, t: Seq<T>)
     }
 }
 
+pub fn exec_is_subseq(s: &[i64], t: &[i64]) -> (b: bool)
+    ensures
+        b == is_subseq(s@, t@),
+{
+    if s.len() == 0 {
+        true
+    } else if t.len() == 0 {
+        false
+    } else {
+        if s[0] == t[0] {
+            exec_is_subseq(slice_subrange(s, 1, s.len()), slice_subrange(t, 1, t.len()))
+        } else {
+            exec_is_subseq(s, slice_subrange(t, 1, t.len()))
+        }
+    }
+}
+
 #[verifier::external_body]
-pub fn test() {}
+pub fn test() {
+    let s = vec![2, 3, 5];
+    let t = vec![1, 2, 3, 4, 5, 6, 7];
+    println!("Q. {:?} is subseq of {:?} ? \nA. {}", s, t, exec_is_subseq(&s, &t));
+
+    let s = vec![2, 3, 5, 7];
+    let t = vec![1, 2, 3, 4, 5, 6, 7];
+    println!("Q. {:?} is subseq of {:?} ? \nA. {}", s, t, exec_is_subseq(&s, &t));
+
+    let s = vec![2, 3, 5, 7, 11];
+    let t = vec![1, 2, 3, 4, 5, 6, 7];
+    println!("Q. {:?} is subseq of {:?} ? \nA. {}", s, t, exec_is_subseq(&s, &t));
+
+    let s = vec![2, 99, 5];
+    let t = vec![1, 2, 3, 4, 5, 6, 7];
+    println!("Q. {:?} is subseq of {:?} ? \nA. {}", s, t, exec_is_subseq(&s, &t));
+}
 
 } // verus!
