@@ -4,6 +4,7 @@ mod binary_search;
 mod strictly_increasing_sequence;
 mod ext_int;
 mod seq_ex;
+mod subseq;
 mod forall_ex;
 
 use max::*;
@@ -19,4 +20,5 @@ fn main() {
     binary_search::test();
     ext_int::test();
     seq_ex::test();
+    subseq::test();
 }
