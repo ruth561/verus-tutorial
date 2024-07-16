@@ -4,7 +4,7 @@ use vstd::prelude::*;
 verus! {
 
 // returns true iff s[0] < s[1] < ... < s[n-1]
-pub closed spec fn strictly_increasing_sequence(s: Seq<i64>) -> bool
+pub open spec fn strictly_increasing_sequence(s: Seq<int>) -> bool
     decreases s.len(),
 {
     if s.len() <= 1 {
@@ -15,7 +15,7 @@ pub closed spec fn strictly_increasing_sequence(s: Seq<i64>) -> bool
 } 
 
 // if strictly_increasing_sequence(s) then forall|i:int, j:int| 0 <= i < j < s.len() ==> s[i] < s[j]
-proof fn lem_1_strictly_increasing_sequence(s: Seq<i64>)
+proof fn lem_1_strictly_increasing_sequence(s: Seq<int>)
     requires
         strictly_increasing_sequence(s),
     ensures
@@ -40,7 +40,7 @@ proof fn lem_1_strictly_increasing_sequence(s: Seq<i64>)
 }
 
 // if forall|i:int, j:int| 0 <= i < j < s.len() ==> s[i] < s[j] then strictly_increasing_sequence(s)
-proof fn lem_2_strictly_increasing_sequence(s: Seq<i64>)
+proof fn lem_2_strictly_increasing_sequence(s: Seq<int>)
     requires
         forall|i:int, j:int| 0 <= i < j < s.len() ==> s[i] < s[j],
     ensures
@@ -52,7 +52,7 @@ proof fn lem_2_strictly_increasing_sequence(s: Seq<i64>)
     }
 }
 
-pub proof fn lem_strictly_increasing_sequence(s: Seq<i64>)
+pub proof fn lem_strictly_increasing_sequence(s: Seq<int>)
     ensures
         strictly_increasing_sequence(s) <==> forall|i:int, j:int| 0 <= i < j < s.len() ==> s[i] < s[j],
 {

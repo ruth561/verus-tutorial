@@ -4,6 +4,7 @@ mod binary_search;
 mod strictly_increasing_sequence;
 mod ext_int;
 mod seq_ex;
+mod forall_ex;
 
 use max::*;
 
