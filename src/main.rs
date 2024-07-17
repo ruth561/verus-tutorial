@@ -6,6 +6,7 @@ mod ext_int;
 mod seq_ex;
 mod subseq;
 mod forall_ex;
+mod dbm;
 
 use max::*;
 
