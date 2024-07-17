@@ -204,6 +204,116 @@ impl ExtInt {
         }
     }
 
+    // check_sub_overflow
+    //   - if self - rhs causes overflow, then return true
+    //   - otherwise false
+    //
+    // Causing overflow cases are
+    //   - inf - inf
+    //   - int - inf
+    //   - int - int 
+    pub closed spec fn spec_check_sub_overflow(self, rhs: ExtInt) -> bool {
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Inf) => true,
+            (ExtInt::Inf, _) => false,
+            (_, ExtInt::Inf) => true,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                if i64::MIN <= n1 - n2 <= i64::MAX {
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    #[verifier::when_used_as_spec(spec_check_sub_overflow)]
+    pub fn check_sub_overflow(self, rhs: ExtInt) -> (b: bool)
+        ensures
+            b == self.check_sub_overflow(rhs),
+    {
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Inf) => true,
+            (ExtInt::Inf, _) => false,
+            (_, ExtInt::Inf) => true,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                let n = n1.checked_sub(n2);
+                if n.is_none() {
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    // checked_sub
+    pub closed spec fn spec_checked_sub(self, rhs: ExtInt) -> Option<ExtInt> {
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Inf) => None,
+            (ExtInt::Inf, _) => Some(ExtInt::Inf),
+            (_, ExtInt::Inf) => None,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                if i64::MIN <= n1 - n2 <= i64::MAX {
+                    Some(ExtInt::Int((n1 - n2) as i64))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    #[verifier::when_used_as_spec(spec_checked_sub)]
+    pub fn checked_sub(self, rhs: ExtInt) -> (result: Option<ExtInt>)
+        ensures
+            result == self.checked_sub(rhs),
+            result.is_none() == self.check_sub_overflow(rhs),
+            result.is_some() ==> (result.unwrap().is_inf() <==> self.is_inf()),
+            result.is_some() && result.unwrap().is_int() ==> (result.unwrap().unwrap() == self.unwrap() - rhs.unwrap()),
+    {
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Inf) => None,
+            (ExtInt::Inf, _) => Some(ExtInt::Inf),
+            (_, ExtInt::Inf) => None,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => {
+                Some(ExtInt::Int(n1.checked_sub(n2)?))
+            }
+        }
+    }
+
+    // sub
+    pub closed spec fn spec_sub(self, rhs: ExtInt) -> (n: ExtInt)
+        recommends
+            !self.check_sub_overflow(rhs),
+    {
+        // unreachable!()のような機能が使えないため、unreachableなコードに対してはこの値をIntで
+        // くるんだ値を返すようにしている。
+        let invalid_ext_int = ExtInt::Int((i64::MIN - 1) as i64);
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Inf) => invalid_ext_int,
+            (ExtInt::Inf, _) => ExtInt::Inf,
+            (_, ExtInt::Inf) => invalid_ext_int,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => ExtInt::Int((n1 - n2) as i64),
+        }
+    }
+
+    #[verifier::when_used_as_spec(spec_sub)]
+    pub fn sub(self, rhs: ExtInt) -> (n: ExtInt)
+        requires
+            !self.check_sub_overflow(rhs),
+        ensures
+            self.checked_sub(rhs) == Some(n),
+    {
+        match (self, rhs) {
+            (ExtInt::Inf, ExtInt::Int(_)) => ExtInt::Inf,
+            (ExtInt::Int(n1), ExtInt::Int(n2)) => ExtInt::Int(n1 - n2),
+            _ => {
+                assert(false); // unreachable!()
+                ExtInt::Int(i64::MIN)
+            }
+        }
+    }
+
     // TODO: checked_sumを、exec関数ではVec<ExtInt>に対して、spec関数ではSeq<ExtInt>に対して
     // 行うようにしたい。ただ、#[verifier::when_used_as_spec(...)]は関数のシグネチャが異なってしまうため、
     // うまくできなさそう。
@@ -418,6 +528,16 @@ pub fn ex_i64_checked_add(lhs: i64, rhs: i64) -> (result: Option<i64>)
     lhs.checked_add(rhs)
 }
 
+// i64::checked_sub(self, i64)
+#[verifier::external_fn_specification]
+pub fn ex_i64_checked_sub(lhs: i64, rhs: i64) -> (result: Option<i64>)
+    ensures
+        lhs - rhs > i64::MAX || lhs - rhs < i64::MIN ==> result.is_None(),
+        i64::MIN <= lhs - rhs <= i64::MAX ==> result == Some((lhs - rhs) as i64),
+{
+    lhs.checked_sub(rhs)
+}
+
 proof fn test_spec()
 {
     let a = ExtInt::Inf;
@@ -518,21 +638,25 @@ pub fn test() {
     x = inf;
     y = inf;
     println!("{:?} + {:?} = {:?}", x, y, x.add(y));
+    println!("{:?} - {:?} = {:?}", x, y, x.checked_sub(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = inf;
     y = n;
     println!("{:?} + {:?} = {:?}", x, y, x.add(y));
+    println!("{:?} - {:?} = {:?}", x, y, x.checked_sub(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = n;
     y = inf;
     println!("{:?} + {:?} = {:?}", x, y, x.add(y));
+    println!("{:?} - {:?} = {:?}", x, y, x.checked_sub(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     x = n;
     y = n;
     println!("{:?} + {:?} = {:?}", x, y, x.add(y));
+    println!("{:?} - {:?} = {:?}", x, y, x.checked_sub(y));
     println!("{:?} < {:?} = {:?}", x, y, x < y);
 
     let a = ExtInt::Inf;
