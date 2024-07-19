@@ -7,6 +7,7 @@ mod seq_ex;
 mod subseq;
 mod forall_ex;
 mod dbm;
+mod integers;
 
 use max::*;
 
@@ -22,4 +23,5 @@ fn main() {
     ext_int::test();
     seq_ex::test();
     subseq::test();
+    integers::test();
 }
