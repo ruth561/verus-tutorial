@@ -11,6 +11,7 @@ mod dbm;
 mod integers;
 mod vec_i64_to_seq_int;
 mod pptr;
+mod set_ex;
 
 use max::*;
 
