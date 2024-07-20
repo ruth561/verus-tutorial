@@ -8,11 +8,6 @@ pub enum ExtInt {
     Inf,
 }
 
-pub enum ResultExtInt {
-    Ok(ExtInt),
-    Overflow,
-}
-
 impl ExtInt {
 
     // utils
