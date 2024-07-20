@@ -115,6 +115,10 @@ impl ExtInt {
         ExtInt::Int(0) <= self
     }
 
+    pub open spec fn is_zero(self) -> bool {
+        ExtInt::Int(0) == self
+    }
+
 }
 
 // proof
@@ -204,6 +208,11 @@ proof fn test_ext_int()
     assert( a.is_non_negative());
     assert(!a.is_negative());
     assert(!a.is_non_positive());
+
+    assert(!   a.is_zero());
+    assert(!   b.is_zero());
+    assert(! inf.is_zero());
+    assert( zero.is_zero());
 }
 
 proof fn test_seq_ext_int()
