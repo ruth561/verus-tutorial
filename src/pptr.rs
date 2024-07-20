@@ -36,6 +36,32 @@ pub fn test()
 
     // 上でpermとdeallocの所有権が消滅したので、この後にptrから読み書きを
     // しようとしてもできない. つまり、UAFを防ぐことができる！！！
+
+    test2();
+}
+
+// こんな使い方もできるらしい
+// ただ、普通にTrackedで囲んでおいた方が扱いやすいしよさそう。
+fn test2()
+{
+    // tracked_permにはmutをつけておかないとborrow_mutが呼び出せない
+    let (ptr, mut tracked_perm, tracked_dealloc) = PPtr::<i64>::new(0x1729);
+
+
+    let v = ptr.read(Tracked(tracked_perm.borrow()));
+    print_val(v);
+
+    ptr.write(Tracked(tracked_perm.borrow_mut()), 0x561);
+
+    let v = ptr.read(Tracked(tracked_perm.borrow()));
+    print_val(v);
+
+    proof {
+        tracked_perm.borrow_mut().leak_contents();
+    }
+
+    ptr.dispose(tracked_perm, tracked_dealloc);
+
 }
 
 #[verifier::external_body]
