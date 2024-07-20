@@ -10,6 +10,7 @@ mod forall_ex;
 mod dbm;
 mod integers;
 mod vec_i64_to_seq_int;
+mod pptr;
 
 use max::*;
 
@@ -26,4 +27,5 @@ fn main() {
     seq_ex::test();
     subseq::test();
     integers::test();
+    pptr::test();
 }
