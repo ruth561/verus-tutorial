@@ -13,21 +13,96 @@ struct Dbm {
 
 impl Dbm {
 
-    spec fn is_consistent(self) -> bool {
+    spec fn idx(self, i: int) -> bool {
+        &&& 0 <= i < self.dimension
+    }
+
+    spec fn idx2(self, i: int, j: int) -> bool {
+        &&& 0 <= i < self.dimension
+        &&& 0 <= j < self.dimension
+    }
+
+    spec fn idx3(self, i: int, j: int, k: int) -> bool {
+        &&& 0 <= i < self.dimension
+        &&& 0 <= j < self.dimension
+        &&& 0 <= k < self.dimension
+    }
+
+    spec fn triangle_inequality(self, i: int, j: int, k: int) -> bool {
+        self.matrix[i][j] <= self.matrix[i][k] + self.matrix[k][j]
+    }
+
+    spec fn well_formed(self) -> bool {
+        &&& 2 <= self.dimension
         &&& is_square_matrix(self.matrix, self.dimension)
-        &&& forall|i:int| 0 <= i < self.dimension ==> #[trigger] is_zero(self.matrix[i][i])
-        &&& forall|i:int| 0 <= i < self.dimension ==> #[trigger] is_non_negative(self.matrix[i][0])
+        &&& forall|i:int| self.idx(i) ==> #[trigger] self.matrix[i][i].is_zero()
+        &&& forall|i:int| self.idx(i) ==> #[trigger] self.matrix[i][0].is_non_negative()
+        &&& forall|i:int| self.idx(i) ==> #[trigger] self.matrix[0][i].is_non_positive()
     }
 
     spec fn is_canonical(self) -> bool {
-        &&& self.is_consistent()
-        &&& forall|i:int, j:int, k:int|
-            0 <= i < self.dimension &&
-            0 <= j < self.dimension &&
-            0 <= k < self.dimension ==>
-            #[trigger] triangle_inequality(self.matrix, i, j, k)
+        &&& self.well_formed()
+        &&& forall|i:int, j:int, k:int| self.idx3(i, j, k) ==> #[trigger] self.triangle_inequality(i, j, k)
     }
 
+}
+
+impl Dbm {
+
+    // proof that the reset operation preserve the canonicity
+    proof fn proof_reset(self, x: int, m: ExtInt) -> (result: Dbm)
+        requires
+            self.is_canonical(),
+            1 <= x < self.dimension,
+            m.is_non_negative(),
+            m.is_int(),
+        ensures
+            result.matrix == spec_reset(self.matrix, self.dimension, x, m),
+            result.is_canonical(),
+    {
+        let result = Dbm {
+            dimension: self.dimension,
+            matrix: spec_reset(self.matrix, self.dimension, x, m),
+        };
+        lem_reset(self.matrix, self.dimension, x, m);
+
+        // needed to prove
+        //   result.matrix[x][0].is_non_negative() and
+        //   result.matrix[0][x].is_non_positive()
+        // since
+        //   result.matrix[x][0] == self.matrix[0][0] + m and 
+        //   result.matrix[0][x] == self.matrix[0][0] - m
+        assert(self.matrix[0][0].is_zero());
+
+        assert forall|i:int, j:int, k:int| result.idx3(i, j, k) implies #[trigger] result.triangle_inequality(i, j, k) by {
+            assert(result.matrix[x][x].is_zero());
+            if        i == x && j == x && k == x {
+                // proof by assert(self.matrix[0][0].is_zero())
+            } else if i == x && j == x && k != x {
+                // result.matrix[x][x] == self.matrix[0][0] <= self.matrix[0][k] + self.matrix[k][0]
+                //   == (self.matrix[0][k] + m) + (self.matrix[k][0] - m) == result.matrix[x][k] + result.matrix[k][x]
+                assert(self.triangle_inequality(0, 0, k));
+            } else if i == x && j != x && k == x {
+                // proof by assert(self.matrix[x][x].is_zero())
+            } else if i == x && j != x && k != x {
+                // result.matrix[x][j] == self.matrix[0][j] + m <= (self.matrix[0][k] + m) + self.matrix[k][j]
+                //   == result.matrix[x][k] + result.matrix[k][j]
+                assert(self.triangle_inequality(0, j, k));
+            } else if i != x && j == x && k == x {
+                // proof by assert(self.matrix[x][x].is_zero())
+            } else if i != x && j == x && k != x {
+                // same as above
+                assert(self.triangle_inequality(i, 0, k));
+            } else if i != x && j != x && k == x {
+                // same as above
+                assert(self.triangle_inequality(i, j, 0));
+            } else {//i != x && j != x && k != x
+                // no change
+                assert(self.triangle_inequality(i, j, k));
+            }
+        };
+        result
+    }
 }
 
 // 引数で受け取った行列がn×nの正方行列であるか？
@@ -40,23 +115,6 @@ spec fn len_is_n<T>(seq: Seq<T>, n: nat) -> bool {
     seq.len() == n
 }
 
-spec fn is_zero(ei: ExtInt) -> bool {
-    ei == ExtInt::Int(0)
-}
-
-spec fn is_non_negative(ei: ExtInt) -> bool {
-    ||| ei.is_inf()
-    ||| ei.is_int() && 0 <= ei.unwrap()
-}
-
-spec fn is_non_positive(ei: ExtInt) -> bool {
-    ei.is_int() && 0 >= ei.unwrap()
-}
-
-spec fn triangle_inequality(matrix: Seq<Seq<ExtInt>>, i: int, j: int, k: int) -> bool {
-    matrix[i][j] <= matrix[i][k] + matrix[k][j]
-}
-
 // resetの処理の前後におけるDBMの関係性を示す述語
 // x行とx列の値が更新され、それ以外の値はd_oldのまま
 // [[---, ???, ... , ---],
@@ -67,9 +125,9 @@ spec fn triangle_inequality(matrix: Seq<Seq<ExtInt>>, i: int, j: int, k: int) ->
 // 単に行列の変換処理を表現したもの
 spec fn spec_reset(matrix: Seq<Seq<ExtInt>>, n: nat, x: int, m: ExtInt) -> Seq<Seq<ExtInt>>
     recommends
-        is_square_matrix(matrix, n),
         1 <= x < n,
-        is_non_negative(m),
+        is_square_matrix(matrix, n),
+        m.is_non_negative(),
         m.is_int(),
 {
     matrix.map(|i:int, seq:Seq<ExtInt>| {
@@ -89,9 +147,9 @@ spec fn spec_reset(matrix: Seq<Seq<ExtInt>>, n: nat, x: int, m: ExtInt) -> Seq<S
 
 proof fn lem_reset(matrix: Seq<Seq<ExtInt>>, n: nat, x: int, m: ExtInt)
     requires
-        is_square_matrix(matrix, n),
         1 <= x < n,
-        is_non_negative(m),
+        is_square_matrix(matrix, n),
+        m.is_non_negative(),
         m.is_int(),
     ensures
         is_square_matrix(spec_reset(matrix, n, x, m), n),

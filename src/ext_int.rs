@@ -8,11 +8,6 @@ pub enum ExtInt {
     Inf,
 }
 
-pub enum ResultExtInt {
-    Ok(ExtInt),
-    Overflow,
-}
-
 impl ExtInt {
 
     // utils
@@ -104,6 +99,26 @@ impl ExtInt {
         }
     }
 
+    pub open spec fn is_positive(self) -> bool {
+        ExtInt::Int(0) < self
+    }
+
+    pub open spec fn is_negative(self) -> bool {
+        ExtInt::Int(0) > self
+    }
+
+    pub open spec fn is_non_positive(self) -> bool {
+        ExtInt::Int(0) >= self
+    }
+
+    pub open spec fn is_non_negative(self) -> bool {
+        ExtInt::Int(0) <= self
+    }
+
+    pub open spec fn is_zero(self) -> bool {
+        ExtInt::Int(0) == self
+    }
+
 }
 
 // proof
@@ -173,6 +188,31 @@ proof fn test_ext_int()
     assert( inf <=  inf);
     assert(zero <=  one);
     assert(zero <= zero);
+
+    assert( inf.is_positive());
+    assert( inf.is_non_negative());
+    assert(!inf.is_negative());
+    assert(!inf.is_non_positive());
+
+    assert(!zero.is_positive());
+    assert( zero.is_non_negative());
+    assert(!zero.is_negative());
+    assert( zero.is_non_positive());
+
+    assert(!b.is_positive());
+    assert(!b.is_non_negative());
+    assert( b.is_negative());
+    assert( b.is_non_positive());
+
+    assert( a.is_positive());
+    assert( a.is_non_negative());
+    assert(!a.is_negative());
+    assert(!a.is_non_positive());
+
+    assert(!   a.is_zero());
+    assert(!   b.is_zero());
+    assert(! inf.is_zero());
+    assert( zero.is_zero());
 }
 
 proof fn test_seq_ext_int()
