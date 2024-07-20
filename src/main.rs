@@ -12,6 +12,7 @@ mod integers;
 mod vec_i64_to_seq_int;
 mod pptr;
 mod set_ex;
+mod linked_list_box;
 
 use max::*;
 
