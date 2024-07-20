@@ -9,6 +9,7 @@ mod subseq;
 mod forall_ex;
 mod dbm;
 mod integers;
+mod vec_i64_to_seq_int;
 
 use max::*;
 
