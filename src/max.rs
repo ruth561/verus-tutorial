@@ -33,7 +33,7 @@ pub exec fn compute_max(x: i32, y: i32) -> (result: i32)
     if x <= y { y } else { x }
 }
 
-pub fn max_test()
+pub fn test()
 {
     let mut v = Vec::new();
     v.push(2);

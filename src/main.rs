@@ -17,16 +17,9 @@ mod max_vec;
 mod linked_list;
 mod map_ex;
 
-use max::*;
 
 fn main() {
-    println!("Hello, world!");
-
-    let x = 3;
-    let y = 0;
-    println!("max({x}, {y}) = {}", compute_max(x, y));
-
-    max_test();
+    max::test();
     binary_search::test();
     ext_i64::test();
     seq_ex::test();
@@ -34,5 +27,6 @@ fn main() {
     integers::test();
     pptr::test();
     max_vec::test();
+    linked_list_box::test();
     linked_list::test();
 }
