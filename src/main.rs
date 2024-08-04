@@ -14,6 +14,7 @@ mod pptr;
 mod set_ex;
 mod linked_list_box;
 mod max_vec;
+mod linked_list;
 mod map_ex;
 
 use max::*;
@@ -33,4 +34,5 @@ fn main() {
     integers::test();
     pptr::test();
     max_vec::test();
+    linked_list::test();
 }
