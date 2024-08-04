@@ -13,6 +13,7 @@ mod vec_i64_to_seq_int;
 mod pptr;
 mod set_ex;
 mod linked_list_box;
+mod max_vec;
 
 use max::*;
 
@@ -30,4 +31,5 @@ fn main() {
     subseq::test();
     integers::test();
     pptr::test();
+    max_vec::test();
 }
