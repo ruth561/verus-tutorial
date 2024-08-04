@@ -1,3 +1,4 @@
+// Usage Examples of forall
 use vstd::prelude::*;
 
 
