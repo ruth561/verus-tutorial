@@ -14,6 +14,7 @@ mod pptr;
 mod set_ex;
 mod linked_list_box;
 mod max_vec;
+mod map_ex;
 
 use max::*;
 
